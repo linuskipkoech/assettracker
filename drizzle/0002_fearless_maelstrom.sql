@@ -1,0 +1,20 @@
+CREATE TABLE `liabilities` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`asset_id` text,
+	`name` text NOT NULL,
+	`type` text NOT NULL,
+	`frequency` text NOT NULL,
+	`amount` real NOT NULL,
+	`currency` text DEFAULT 'KES' NOT NULL,
+	`outstanding_balance` real,
+	`interest_rate_percent` real,
+	`start_date` integer,
+	`next_due_date` integer,
+	`notes` text,
+	`status` text DEFAULT 'ACTIVE' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`asset_id`) REFERENCES `assets`(`id`) ON UPDATE no action ON DELETE set null
+);
