@@ -118,6 +118,47 @@ export const LIABILITY_STATUSES = ["ACTIVE", "PAID_OFF", "CANCELLED"] as const;
 export type LiabilityStatus = (typeof LIABILITY_STATUSES)[number];
 
 // ---------------------------------------------------------------------------
+// Crop cycles — one planting-to-harvest season for one crop on one farm
+// asset. Expenses are recorded along the way; harvest closes the loop with
+// yield + sale revenue so the farmer can see true profit per season/acre.
+// ---------------------------------------------------------------------------
+
+export const CROP_CYCLE_STATUSES = ["PLANNED", "GROWING", "HARVESTED", "SOLD"] as const;
+export type CropCycleStatus = (typeof CROP_CYCLE_STATUSES)[number];
+
+export const CROP_CYCLE_STATUS_LABELS: Record<CropCycleStatus, string> = {
+  PLANNED: "Planned",
+  GROWING: "Growing",
+  HARVESTED: "Harvested",
+  SOLD: "Sold",
+};
+
+export const CROP_EXPENSE_CATEGORIES = [
+  "LAND_PREP",
+  "SEEDS",
+  "FERTILIZER",
+  "PESTICIDE",
+  "LABOUR",
+  "IRRIGATION",
+  "EQUIPMENT",
+  "TRANSPORT",
+  "OTHER",
+] as const;
+export type CropExpenseCategory = (typeof CROP_EXPENSE_CATEGORIES)[number];
+
+export const CROP_EXPENSE_CATEGORY_LABELS: Record<CropExpenseCategory, string> = {
+  LAND_PREP: "Land preparation",
+  SEEDS: "Seeds / planting material",
+  FERTILIZER: "Fertilizer",
+  PESTICIDE: "Pesticide / herbicide",
+  LABOUR: "Labour",
+  IRRIGATION: "Irrigation / water",
+  EQUIPMENT: "Equipment hire",
+  TRANSPORT: "Transport",
+  OTHER: "Other",
+};
+
+// ---------------------------------------------------------------------------
 // Beneficiaries & inactivity safety net
 // ---------------------------------------------------------------------------
 

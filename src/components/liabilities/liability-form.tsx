@@ -190,6 +190,11 @@ export function LiabilityForm({
               </option>
             ))}
           </select>
+          <p className="text-xs text-muted mt-1">
+            Link it when this cost belongs to a specific asset — e.g. fertilizer bought for a
+            maize farm, or a mortgage on a property. Anything owed is deducted from that
+            asset&apos;s net value, and counted once in your overall net worth.
+          </p>
         </div>
       )}
 

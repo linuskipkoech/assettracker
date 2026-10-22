@@ -359,3 +359,77 @@ export const checkinTokens = sqliteTable("checkin_tokens", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+// ---------------------------------------------------------------------------
+// Crop cycles & their expenses.
+//
+// A crop cycle tracks one crop on one FARM asset from planting to harvest:
+// what was planted, when, on how many acres, every expense recorded along
+// the way, and the closing numbers (yield + sale revenue) that turn those
+// expenses into a profit-per-season / profit-per-acre figure.
+//
+// An expense bought on credit also creates a row in `liabilities` tied to
+// the same farm asset (liabilityId below) — so the fertilizer a farmer took
+// on agrovet credit shows up both in the season's costs AND as money owed
+// against that farm, without ever being double-counted in net worth (net
+// worth subtracts liabilities once, globally; cycle expenses are a
+// crop-profit view, not a second deduction).
+// ---------------------------------------------------------------------------
+
+export const cropCycles = sqliteTable("crop_cycles", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // The FARM asset this cycle belongs to. Validated at the app layer
+  // (the asset must exist, belong to the user, and be type FARM).
+  assetId: text("asset_id")
+    .notNull()
+    .references(() => assets.id, { onDelete: "cascade" }),
+
+  name: text("name").notNull(), // e.g. "Short Rains 2026 — Maize"
+  crop: text("crop").notNull(), // e.g. "Maize"
+  status: text("status").notNull().default("PLANNED"), // PLANNED | GROWING | HARVESTED | SOLD
+  acreage: real("acreage"),
+
+  plantingDate: integer("planting_date", { mode: "timestamp" }),
+  expectedHarvestDate: integer("expected_harvest_date", { mode: "timestamp" }),
+  harvestedDate: integer("harvested_date", { mode: "timestamp" }),
+
+  // Closing numbers, filled in at harvest / sale time.
+  harvestQuantity: real("harvest_quantity"),
+  harvestUnit: text("harvest_unit"), // e.g. "90kg bags", "kg", "crates"
+  saleRevenue: real("sale_revenue"),
+
+  notes: text("notes"),
+  ...timestamps,
+});
+
+export const cropExpenses = sqliteTable("crop_expenses", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  cycleId: text("cycle_id")
+    .notNull()
+    .references(() => cropCycles.id, { onDelete: "cascade" }),
+
+  // LAND_PREP | SEEDS | FERTILIZER | PESTICIDE | LABOUR | IRRIGATION | EQUIPMENT | TRANSPORT | OTHER
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull().default("KES"),
+  expenseDate: integer("expense_date", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+
+  // Set when this expense was bought on credit: the liability created for
+  // it (tied to the same farm asset). Kept for reference; deleting the
+  // expense does not silently delete the debt — the farmer settles or
+  // removes the liability explicitly from the farm's liabilities list.
+  liabilityId: text("liability_id").references(() => liabilities.id, {
+    onDelete: "set null",
+  }),
+
+  ...timestamps,
+});

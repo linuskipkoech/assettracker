@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Sparkles,
   ShieldCheck,
+  Sprout,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,6 +18,7 @@ export const NAV_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/assets", label: "Assets", icon: Wallet },
   { href: "/liabilities", label: "Liabilities", icon: TrendingDown },
+  { href: "/crop-cycles", label: "Crop Cycles", icon: Sprout },
   { href: "/advisors", label: "Advisors", icon: Users },
   { href: "/consultations", label: "Consultations", icon: MessageSquare },
   { href: "/assistant", label: "AI Assistant", icon: Sparkles },

@@ -10,6 +10,8 @@ import {
   LIABILITY_TYPES,
   LIABILITY_FREQUENCIES,
   LIABILITY_STATUSES,
+  CROP_CYCLE_STATUSES,
+  CROP_EXPENSE_CATEGORIES,
 } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -192,6 +194,34 @@ export const liabilityInputSchema = z.object({
   status: z.enum(LIABILITY_STATUSES).default("ACTIVE"),
   // Null/omitted for a standalone liability not tied to any asset.
   assetId: z.string().min(1).optional().nullable(),
+});
+
+export const cropCycleInputSchema = z.object({
+  assetId: z.string().min(1, "Choose the farm this crop cycle belongs to"),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
+  crop: z.string().trim().min(2, "Crop must be at least 2 characters").max(80),
+  status: z.enum(CROP_CYCLE_STATUSES).default("PLANNED"),
+  acreage: z.number().positive("Acreage must be above zero").max(1_000_000).optional(),
+  plantingDate: z.coerce.date().optional(),
+  expectedHarvestDate: z.coerce.date().optional(),
+  harvestedDate: z.coerce.date().optional(),
+  harvestQuantity: nonNegativeMoney.optional(),
+  harvestUnit: z.string().trim().max(30).optional().or(z.literal("")),
+  saleRevenue: nonNegativeMoney.optional(),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+export const cropCycleUpdateSchema = cropCycleInputSchema.partial().omit({ assetId: true });
+
+export const cropExpenseInputSchema = z.object({
+  category: z.enum(CROP_EXPENSE_CATEGORIES),
+  description: z.string().trim().min(2, "Description must be at least 2 characters").max(200),
+  amount: money.positive("Amount must be above zero"),
+  expenseDate: z.coerce.date().optional(),
+  // Bought on credit (e.g. fertilizer from the agrovet, payable after
+  // harvest): also creates a liability tied to the cycle's farm asset.
+  onCredit: z.boolean().optional().default(false),
+  creditDueDate: z.coerce.date().optional(),
 });
 
 export const activitySettingsSchema = z.object({

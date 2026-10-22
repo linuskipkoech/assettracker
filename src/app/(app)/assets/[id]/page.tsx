@@ -1,10 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil, Sparkles, MapPin } from "lucide-react";
+import { Pencil, Sparkles, MapPin, Sprout, ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/session";
 import { getAssetForUser } from "@/lib/repositories/assets";
-import { listLiabilitiesForAsset } from "@/lib/repositories/liabilities";
-import { ASSET_TYPE_LABELS, type AssetType } from "@/lib/constants";
+import {
+  listLiabilitiesForAsset,
+  summarizeLiabilities,
+} from "@/lib/repositories/liabilities";
+import {
+  listCropCyclesForUser,
+  summarizeCropCycle,
+} from "@/lib/repositories/crop-cycles";
+import { Badge } from "@/components/ui/badge";
+import { CreateCropCycleSection } from "@/components/crop-cycles/crop-cycle-ui";
+import {
+  ASSET_TYPE_LABELS,
+  CROP_CYCLE_STATUS_LABELS,
+  type AssetType,
+  type CropCycleStatus,
+} from "@/lib/constants";
 import { formatMoney, formatDate } from "@/lib/format";
 import { AssetTypeIconBadge } from "@/components/ui/asset-type-icon";
 import {
@@ -62,6 +76,14 @@ export default async function AssetDetailPage({
   if (!asset) notFound();
 
   const liabilities = await listLiabilitiesForAsset(asset.id, user.id);
+  const linkedSummary = summarizeLiabilities(liabilities);
+  // What this asset is worth once what is owed against it is deducted.
+  // Overall net worth subtracts every liability exactly once (on the
+  // dashboard) — this per-asset figure is the same deduction, shown where
+  // it belongs, never an additional one.
+  const netAssetValue = asset.currentValue - linkedSummary.totalOutstandingBalance;
+  const cropCycles =
+    asset.type === "FARM" ? await listCropCyclesForUser(user.id, asset.id) : [];
   const liabilityItems: LiabilityItem[] = liabilities.map((l) => ({
     id: l.id,
     name: l.name,
@@ -113,8 +135,51 @@ export default async function AssetDetailPage({
       </div>
 
       <div className="card p-6">
-        <p className="label mb-1">Current value</p>
-        <p className="text-3xl font-bold">{formatMoney(asset.currentValue, asset.currency)}</p>
+        {linkedSummary.totalOutstandingBalance > 0 || linkedSummary.totalMonthlyOutgoings > 0 ? (
+          <>
+            <div className="flex items-start justify-between flex-wrap gap-4">
+              <div>
+                <p className="label mb-1">Net value in this asset</p>
+                <p className="text-3xl font-bold">
+                  {formatMoney(netAssetValue, asset.currency)}
+                </p>
+                <p className="text-xs text-muted mt-1">
+                  What&apos;s left of this asset&apos;s value after what&apos;s owed against
+                  it — already counted once in your overall net worth.
+                </p>
+              </div>
+            </div>
+            <dl className="mt-5 space-y-2 text-sm">
+              <div className="flex justify-between border-b border-border pb-2">
+                <dt className="text-muted">Current value</dt>
+                <dd className="font-medium">{formatMoney(asset.currentValue, asset.currency)}</dd>
+              </div>
+              {linkedSummary.totalOutstandingBalance > 0 && (
+                <div className="flex justify-between border-b border-border pb-2">
+                  <dt className="text-muted">
+                    Less: owed against this asset ({linkedSummary.activeCount} active)
+                  </dt>
+                  <dd className="font-medium text-danger">
+                    −{formatMoney(linkedSummary.totalOutstandingBalance, asset.currency)}
+                  </dd>
+                </div>
+              )}
+              {linkedSummary.totalMonthlyOutgoings > 0 && (
+                <div className="flex justify-between border-b border-border pb-2">
+                  <dt className="text-muted">Going out against this asset</dt>
+                  <dd className="font-medium">
+                    {formatMoney(linkedSummary.totalMonthlyOutgoings, asset.currency)} / month
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </>
+        ) : (
+          <>
+            <p className="label mb-1">Current value</p>
+            <p className="text-3xl font-bold">{formatMoney(asset.currentValue, asset.currency)}</p>
+          </>
+        )}
         {asset.acquisitionValue != null && (
           <p className="text-sm text-muted mt-2">
             Acquired for {formatMoney(asset.acquisitionValue, asset.currency)}
@@ -145,6 +210,63 @@ export default async function AssetDetailPage({
           <AddValuationForm assetId={asset.id} currency={asset.currency} />
         </div>
       </div>
+
+      {asset.type === "FARM" && (
+        <div className="card p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <Sprout className="size-5 text-primary" />
+              Crop cycles on this farm
+            </h2>
+            <p className="text-sm text-muted mt-1">
+              Track a crop from planting to harvest — record every expense along the way
+              and see the season&apos;s true cost, revenue, and profit per acre.
+            </p>
+          </div>
+          {cropCycles.length > 0 && (
+            <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+              {cropCycles.map((cycle) => {
+                const summary = summarizeCropCycle(cycle, cycle.expenses);
+                return (
+                  <Link
+                    key={cycle.id}
+                    href={`/crop-cycles/${cycle.id}`}
+                    className="flex items-center gap-3 p-3.5 hover:bg-black/[.02] dark:hover:bg-white/[.03] transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate flex items-center gap-2">
+                        {cycle.name}
+                        <Badge
+                          tone={
+                            cycle.status === "SOLD"
+                              ? "success"
+                              : cycle.status === "HARVESTED"
+                                ? "warning"
+                                : cycle.status === "GROWING"
+                                  ? "primary"
+                                  : "default"
+                          }
+                        >
+                          {CROP_CYCLE_STATUS_LABELS[cycle.status as CropCycleStatus] ??
+                            cycle.status}
+                        </Badge>
+                      </p>
+                      <p className="text-xs text-muted mt-0.5 truncate">
+                        Costs {formatMoney(summary.totalExpenses, asset.currency)}
+                        {summary.hasRevenue
+                          ? ` · Revenue ${formatMoney(summary.saleRevenue, asset.currency)} · Profit ${formatMoney(summary.grossProfit, asset.currency)}`
+                          : " · not yet harvested / sold"}
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <CreateCropCycleSection assetId={asset.id} />
+        </div>
+      )}
 
       <div className="card p-6 space-y-4">
         <h2 className="font-semibold">Liabilities linked to this asset</h2>

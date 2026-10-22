@@ -18,6 +18,10 @@ import {
   landDetails,
   propertyDetails,
   advisors,
+  liabilities,
+  cropCycles,
+  cropExpenses,
+  beneficiaries,
 } from "./schema";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "../lib/password";
@@ -166,6 +170,106 @@ async function main() {
     occupied: true,
   });
   await db.insert(valuationHistory).values({ assetId: property.id, value: 5_000_000, note: "Initial value" });
+
+  // --- The farm's story: a crop cycle, its expenses, and credit tied to it --
+  // Short Rains 2026 maize, still growing. The DAP fertilizer was taken on
+  // agrovet credit: it is BOTH an expense of this season AND a liability
+  // tied to the farm — the same shilling seen from both sides, deducted
+  // once (as a liability) in net worth. Figures match the marketing
+  // homepage's demo preview: assets 14,850,000 - owed 96,000 = 14,754,000.
+  const [dapLiability] = await db
+    .insert(liabilities)
+    .values({
+      userId: demoUser.id,
+      assetId: farm.id,
+      name: "DAP fertilizer (credit)",
+      type: "OTHER",
+      frequency: "ONE_TIME",
+      amount: 96_000,
+      outstandingBalance: 96_000,
+      nextDueDate: new Date("2027-02-12"),
+      notes: "Supplier credit from Wanjiru Agrovet — payable after the short-rains harvest.",
+      status: "ACTIVE",
+    })
+    .returning();
+
+  const [shortRains] = await db
+    .insert(cropCycles)
+    .values({
+      userId: demoUser.id,
+      assetId: farm.id,
+      name: "Short Rains 2026 — Maize",
+      crop: "Maize",
+      status: "GROWING",
+      acreage: 8,
+      plantingDate: new Date("2026-10-12"),
+      expectedHarvestDate: new Date("2027-02-12"),
+    })
+    .returning();
+  await db.insert(cropExpenses).values([
+    {
+      userId: demoUser.id,
+      cycleId: shortRains.id,
+      category: "LAND_PREP",
+      description: "Ploughing & harrowing — tractor hire",
+      amount: 38_000,
+      expenseDate: new Date("2026-10-05"),
+    },
+    {
+      userId: demoUser.id,
+      cycleId: shortRains.id,
+      category: "SEEDS",
+      description: "Certified maize seed — 40kg (DH04)",
+      amount: 53_000,
+      expenseDate: new Date("2026-10-12"),
+    },
+    {
+      userId: demoUser.id,
+      cycleId: shortRains.id,
+      category: "FERTILIZER",
+      description: "DAP fertilizer — 10 bags from the agrovet (on credit)",
+      amount: 96_000,
+      expenseDate: new Date("2026-10-14"),
+      liabilityId: dapLiability.id,
+    },
+  ]);
+
+  // Last season, closed out: the payoff view — revenue against every cost.
+  const [longRains] = await db
+    .insert(cropCycles)
+    .values({
+      userId: demoUser.id,
+      assetId: farm.id,
+      name: "Long Rains 2026 — Maize",
+      crop: "Maize",
+      status: "SOLD",
+      acreage: 8,
+      plantingDate: new Date("2026-03-16"),
+      expectedHarvestDate: new Date("2026-08-10"),
+      harvestedDate: new Date("2026-08-18"),
+      harvestQuantity: 96,
+      harvestUnit: "90kg bags",
+      saleRevenue: 780_000,
+    })
+    .returning();
+  await db.insert(cropExpenses).values([
+    { userId: demoUser.id, cycleId: longRains.id, category: "LAND_PREP", description: "Ploughing & harrowing", amount: 40_000, expenseDate: new Date("2026-03-10") },
+    { userId: demoUser.id, cycleId: longRains.id, category: "SEEDS", description: "Certified maize seed — 40kg", amount: 48_000, expenseDate: new Date("2026-03-16") },
+    { userId: demoUser.id, cycleId: longRains.id, category: "FERTILIZER", description: "DAP + CAN top dressing", amount: 110_000, expenseDate: new Date("2026-03-20") },
+    { userId: demoUser.id, cycleId: longRains.id, category: "PESTICIDE", description: "Fall armyworm spray", amount: 18_000, expenseDate: new Date("2026-05-06") },
+    { userId: demoUser.id, cycleId: longRains.id, category: "LABOUR", description: "Weeding (x2) + harvest casuals", amount: 64_000, expenseDate: new Date("2026-06-02") },
+    { userId: demoUser.id, cycleId: longRains.id, category: "TRANSPORT", description: "Transport to Njoro cereal store", amount: 25_000, expenseDate: new Date("2026-08-19") },
+  ]);
+
+  // One beneficiary, so the safety net isn't an empty page in the demo.
+  await db.insert(beneficiaries).values({
+    userId: demoUser.id,
+    name: "Peter Wanjiru",
+    relationship: "Sibling",
+    email: "peter.wanjiru@example.com",
+    phone: "+254700000001",
+    priority: 0,
+  });
 
   // A couple of advisor accounts so the directory isn't empty.
   const advisorPasswordHash = await hashPassword("advisorpass123");

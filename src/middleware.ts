@@ -15,6 +15,7 @@ const PROTECTED_PREFIXES = [
   "/consultations",
   "/assistant",
   "/beneficiaries",
+  "/crop-cycles",
 ];
 
 export default auth((req) => {
